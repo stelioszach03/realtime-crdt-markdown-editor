@@ -49,7 +49,7 @@ export class WebSocketClient {
     // Determine WebSocket URL - use backend port
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const hostname = window.location.hostname;
-    this.baseUrl = `${protocol}//${hostname}:53520`;
+    this.baseUrl = `${protocol}//${hostname}:8000`;
   }
 
   connect(): void {

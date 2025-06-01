@@ -53,6 +53,7 @@ export const DocumentRoom: React.FC = () => {
   });
 
   // Load document data
+  // Load document data
   useEffect(() => {
     if (!documentId) {
       navigate('/');
@@ -60,7 +61,7 @@ export const DocumentRoom: React.FC = () => {
     }
 
     loadDocument();
-  }, [documentId]);
+  }, [documentId]); // Μην βάλεις το navigate στις dependencies!
 
   // Initialize CRDT when document loads
   useEffect(() => {

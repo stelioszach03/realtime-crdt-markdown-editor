@@ -56,7 +56,7 @@ class ApiClient {
 
   constructor() {
     // Use environment variable or default to backend port
-    this.baseUrl = (import.meta as any).env?.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:53520`;
+    this.baseUrl = (import.meta as any).env?.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:8000`;
     
     // Load token from localStorage
     this.token = localStorage.getItem('auth_token');
