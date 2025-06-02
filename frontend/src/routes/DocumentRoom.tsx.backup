@@ -134,12 +134,12 @@ export const DocumentRoom: React.FC = () => {
   // Fullscreen functionality
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!window.document.fullscreenElement);
+      setIsFullscreen(!!document.fullscreenElement);
     };
 
-    window.document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => {
-      window.document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
   }, []);
 
@@ -238,7 +238,7 @@ export const DocumentRoom: React.FC = () => {
     if (!isFullscreen) {
       containerRef.current.requestFullscreen();
     } else {
-      window.document.exitFullscreen();
+      document.exitFullscreen();
     }
   };
 
@@ -251,7 +251,7 @@ export const DocumentRoom: React.FC = () => {
         // Export as Markdown
         const blob = new Blob([content], { type: 'text/markdown' });
         const url = URL.createObjectURL(blob);
-        const a = window.document.createElement('a');
+        const a = document.createElement('a');
         a.href = url;
         a.download = filename;
         a.click();
@@ -278,7 +278,7 @@ export const DocumentRoom: React.FC = () => {
 </html>`;
         const blob = new Blob([html], { type: 'text/html' });
         const url = URL.createObjectURL(blob);
-        const a = window.document.createElement('a');
+        const a = document.createElement('a');
         a.href = url;
         a.download = filename;
         a.click();
@@ -411,13 +411,13 @@ export const DocumentRoom: React.FC = () => {
                 {connectedUsers.size > 1 && (
                   <div className="flex items-center">
                     <div className="flex -space-x-2">
-                      {Array.from(connectedUsers.values()).slice(0, 3).map((userData, idx) => (
+                      {Array.from(connectedUsers).slice(0, 3).map((username, idx) => (
                         <div
-                          key={userData.site_id}
+                          key={username}
                           className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-xs font-medium border-2 border-white dark:border-neutral-900"
-                          title={userData.username}
+                          title={username}
                         >
-                          {userData.username.charAt(0).toUpperCase()}
+                          {username.charAt(0).toUpperCase()}
                         </div>
                       ))}
                       {connectedUsers.size > 3 && (
