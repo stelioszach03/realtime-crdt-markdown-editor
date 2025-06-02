@@ -1,5 +1,5 @@
 /**
- * Authentication hook for managing user state
+ * Simplified authentication hook to fix infinite loading issue
  */
 import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import { apiClient, User, LoginCredentials, SignupData } from '../api/apiClient';
@@ -29,7 +29,7 @@ export const useAuth = (): AuthContextType => {
   return context;
 };
 
-export const useAuthState = () => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<AuthState>({
     user: null,
     isLoading: true,
@@ -37,61 +37,58 @@ export const useAuthState = () => {
     isGuest: false,
   });
 
-  const setLoading = useCallback((isLoading: boolean) => {
-    setState(prev => ({ ...prev, isLoading }));
-  }, []);
-
-  const setUser = useCallback((user: User | null) => {
-    const token = apiClient.getToken();
-    const isGuest = token ? token.includes('guest_') : false;
-    
-    setState({
-      user,
-      isLoading: false,
-      isAuthenticated: user !== null,
-      isGuest,
-    });
-  }, []);
-
   const login = useCallback(async (credentials: LoginCredentials) => {
-    setLoading(true);
+    setState(prev => ({ ...prev, isLoading: true }));
     try {
       await apiClient.login(credentials);
       const user = await apiClient.getCurrentUser();
-      setUser(user);
+      setState({
+        user,
+        isLoading: false,
+        isAuthenticated: true,
+        isGuest: false,
+      });
     } catch (error) {
-      setLoading(false);
+      setState(prev => ({ ...prev, isLoading: false }));
       throw error;
     }
-  }, [setLoading, setUser]);
+  }, []);
 
   const signup = useCallback(async (userData: SignupData) => {
-    setLoading(true);
+    setState(prev => ({ ...prev, isLoading: true }));
     try {
       await apiClient.signup(userData);
-      // Auto-login after signup
       await apiClient.login({
         username: userData.username,
         password: userData.password,
       });
-      const currentUser = await apiClient.getCurrentUser();
-      setUser(currentUser);
+      const user = await apiClient.getCurrentUser();
+      setState({
+        user,
+        isLoading: false,
+        isAuthenticated: true,
+        isGuest: false,
+      });
     } catch (error) {
-      setLoading(false);
+      setState(prev => ({ ...prev, isLoading: false }));
       throw error;
     }
-  }, [setLoading, setUser]);
+  }, []);
 
   const logout = useCallback(() => {
     apiClient.logout();
-    setUser(null);
-  }, [setUser]);
+    setState({
+      user: null,
+      isLoading: false,
+      isAuthenticated: false,
+      isGuest: false,
+    });
+  }, []);
 
   const loginAsGuest = useCallback(async () => {
-    setLoading(true);
+    setState(prev => ({ ...prev, isLoading: true }));
     try {
       await apiClient.createGuestToken();
-      // For guest users, we don't have a user object
       setState({
         user: null,
         isLoading: false,
@@ -99,17 +96,13 @@ export const useAuthState = () => {
         isGuest: true,
       });
     } catch (error) {
-      setLoading(false);
+      setState(prev => ({ ...prev, isLoading: false }));
       throw error;
     }
-  }, [setLoading]);
+  }, []);
 
   const refreshUser = useCallback(async () => {
-    console.log('[AUTH] refreshUser called, isAuthenticated:', apiClient.isAuthenticated());
-    
     if (!apiClient.isAuthenticated()) {
-      console.log('[AUTH] No token found, setting loading to false');
-      // CRITICAL FIX: Must set loading to false when not authenticated
       setState({
         user: null,
         isLoading: false,
@@ -121,7 +114,6 @@ export const useAuthState = () => {
 
     const token = apiClient.getToken();
     if (token && token.includes('guest_')) {
-      // Guest user
       setState({
         user: null,
         isLoading: false,
@@ -133,40 +125,40 @@ export const useAuthState = () => {
 
     try {
       const user = await apiClient.getCurrentUser();
-      setUser(user);
-    } catch (error) {
-      // Don't call logout here to avoid circular dependency
-      // Just clear the user
-      apiClient.logout();
-      setUser(null);
-    }
-  }, [setUser]);
-
-  // Initialize auth state on mount
-  useEffect(() => {
-    console.log('[AUTH] useEffect running, calling refreshUser');
-    refreshUser();
-    
-    // Fallback timeout to ensure loading stops
-    const timeout = setTimeout(() => {
-      console.log('[AUTH] Fallback timeout triggered');
-      setState(prev => {
-        if (prev.isLoading) {
-          console.log('[AUTH] Force setting loading to false');
-          return {
-            ...prev,
-            isLoading: false,
-            isAuthenticated: false,
-          };
-        }
-        return prev;
+      setState({
+        user,
+        isLoading: false,
+        isAuthenticated: true,
+        isGuest: false,
       });
-    }, 2000); // 2 second timeout
-    
-    return () => clearTimeout(timeout);
-  }, [refreshUser]);
+    } catch (error) {
+      apiClient.logout();
+      setState({
+        user: null,
+        isLoading: false,
+        isAuthenticated: false,
+        isGuest: false,
+      });
+    }
+  }, []);
 
-  return {
+  // Initialize auth state on mount - ONLY ONCE
+  useEffect(() => {
+    let mounted = true;
+    
+    const init = async () => {
+      if (!mounted) return;
+      await refreshUser();
+    };
+    
+    init();
+    
+    return () => {
+      mounted = false;
+    };
+  }, []); // Empty dependency array - run only once
+
+  const value: AuthContextType = {
     ...state,
     login,
     signup,
@@ -174,15 +166,9 @@ export const useAuthState = () => {
     loginAsGuest,
     refreshUser,
   };
-};
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  console.log('[AuthProvider] Rendering');
-  const authState = useAuthState();
-  console.log('[AuthProvider] authState:', authState);
-  
   return (
-    <AuthContext.Provider value={authState}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

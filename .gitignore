@@ -31,6 +31,8 @@ env/
 *.db
 *.sqlite3
 db.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
 
 # IDE
 .vscode/
@@ -53,6 +55,10 @@ backend.log
 frontend.log
 servers.log
 nohup.out
+app.log
+backend/app.log
+backend/backend.log
+frontend/frontend.log
 
 # Browser screenshots (testing artifacts)
 .browser_screenshots/

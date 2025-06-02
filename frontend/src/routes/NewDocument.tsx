@@ -3,12 +3,12 @@
  */
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../hooks/useAuthSimplified';
 import { useToastHelpers } from '../components/Shared/Toast';
 import { NewDocumentForm } from '../components/RoomSelector/NewDocumentForm';
 import { apiClient } from '../api/apiClient';
 
-export const NewDocument: React.FC = () => {
+const NewDocumentComponent: React.FC = () => {
   const navigate = useNavigate();
   const { isAuthenticated, loginAsGuest } = useAuth();
   const { error } = useToastHelpers();
@@ -54,3 +54,5 @@ export const NewDocument: React.FC = () => {
     </div>
   );
 };
+
+export const NewDocument = React.memo(NewDocumentComponent);

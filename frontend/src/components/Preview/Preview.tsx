@@ -3,15 +3,26 @@
  */
 import React, { useMemo } from 'react';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 // import hljs from 'highlight.js';
 import 'highlight.js/styles/github.css';
+
+// Configure marked once at module level for performance
+marked.setOptions({
+  gfm: true,
+  breaks: true,
+  // highlight: function(code: string, lang: string) {
+  //   const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+  //   return hljs.highlight(code, { language }).value;
+  // }
+});
 
 interface PreviewProps {
   content: string;
   className?: string;
 }
 
-export const Preview: React.FC<PreviewProps> = ({ content, className = '' }) => {
+const PreviewComponent: React.FC<PreviewProps> = ({ content, className = '' }) => {
   // Configure marked with syntax highlighting
   const htmlContent = useMemo(() => {
     if (!content.trim()) {
@@ -19,19 +30,19 @@ export const Preview: React.FC<PreviewProps> = ({ content, className = '' }) => 
     }
 
     try {
-      // Configure marked options
-      marked.setOptions({
-        gfm: true,
-        breaks: true,
-        // highlight: function(code: string, lang: string) {
-        //   const language = hljs.getLanguage(lang) ? lang : 'plaintext';
-        //   return hljs.highlight(code, { language }).value;
-        // }
+      const rawHtml = marked.parse(content) as string;
+      // Sanitize HTML to prevent XSS attacks
+      return DOMPurify.sanitize(rawHtml, { 
+        ALLOWED_TAGS: ['div', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 
+                      'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 
+                      'a', 'strong', 'em', 'del', 'ins', 'br', 'hr',
+                      'table', 'thead', 'tbody', 'tr', 'th', 'td',
+                      'img', 'span', 'sup', 'sub', 'mark'],
+        ALLOWED_ATTR: ['href', 'title', 'src', 'alt', 'class', 'id', 
+                       'target', 'rel', 'width', 'height']
       });
-
-      return marked.parse(content);
     } catch (error) {
-      console.error('Markdown parsing error:', error);
+      // Silently handle parsing errors
       return '<div class="text-red-500">Error parsing markdown</div>';
     }
   }, [content]);
@@ -44,3 +55,5 @@ export const Preview: React.FC<PreviewProps> = ({ content, className = '' }) => 
     </div>
   );
 };
+
+export const Preview = React.memo(PreviewComponent);

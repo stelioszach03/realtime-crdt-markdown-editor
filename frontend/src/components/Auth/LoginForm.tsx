@@ -2,7 +2,7 @@
  * Login form component with validation
  */
 import React, { useState } from 'react';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from '../../hooks/useAuthSimplified';
 import { useToastHelpers } from '../Shared/Toast';
 import { Button } from '../Shared/Button';
 import { Input } from '../Shared/Input';

@@ -12,7 +12,24 @@ export default defineConfig({
   },
   build: {
     outDir: 'build',
-    sourcemap: true
+    sourcemap: false, // Disable sourcemaps in production for smaller bundle
+    minify: 'esbuild', // Use esbuild instead of terser (faster and built-in)
+    rollupOptions: {
+      output: {
+        // Optimize chunk splitting
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'editor-vendor': ['marked'],
+          'ui-vendor': ['lucide-react']
+        }
+      }
+    },
+    // Increase chunk size warning limit
+    chunkSizeWarningLimit: 1000
+  },
+  optimizeDeps: {
+    // Pre-bundle heavy dependencies
+    include: ['react', 'react-dom', 'react-router-dom', 'marked', 'lucide-react']
   },
   define: {
     'process.env': {}

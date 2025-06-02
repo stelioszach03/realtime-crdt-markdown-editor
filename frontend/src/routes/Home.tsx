@@ -17,22 +17,16 @@ import {
   Star,
   Trash2,
   MoreVertical,
-  Calendar,
-  TrendingUp,
-  Download,
-  Upload,
-  FolderOpen,
   Hash,
   SortAsc,
   SortDesc,
   Layout,
   Sparkles
 } from 'lucide-react';
-import { useAuth } from '../hooks/useAuth.tsx';
+import { useAuth } from '../hooks/useAuthSimplified';
 import { useToastHelpers } from '../components/Shared/Toast';
 import { Button } from '../components/Shared/Button';
 import { Input } from '../components/Shared/Input';
-import { LoadingSpinner } from '../components/Shared/LoadingSpinner';
 import { Modal } from '../components/Shared/Modal';
 import { NewDocumentForm } from '../components/RoomSelector/NewDocumentForm';
 import { DocumentSkeleton } from '../components/Shared/DocumentSkeleton';
@@ -50,7 +44,7 @@ interface DocumentWithMeta extends Document {
   wordCount?: number;
 }
 
-export const Home: React.FC = () => {
+const HomeComponent: React.FC = () => {
   const { isAuthenticated, isGuest, user, loginAsGuest } = useAuth();
   const { error, success } = useToastHelpers();
   const navigate = useNavigate();
@@ -61,12 +55,11 @@ export const Home: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  const [sortBy, setSortBy] = useState<SortBy>('updated');
+  const [sortBy] = useState<SortBy>('updated');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [filterTag, setFilterTag] = useState<FilterTag>('all');
   const [showNewDocModal, setShowNewDocModal] = useState(false);
   const [showTemplatesModal, setShowTemplatesModal] = useState(false);
-  const [selectedDocuments, setSelectedDocuments] = useState<Set<string>>(new Set());
   const [showFilterMenu, setShowFilterMenu] = useState(false);
 
   // Handle guest login
@@ -90,19 +83,22 @@ export const Home: React.FC = () => {
   }, [isAuthenticated]);
 
   const loadDocuments = async () => {
+    // Don't reload if already loading
+    if (isLoading) return;
+    
     setIsLoading(true);
     try {
       const response = await apiClient.getDocuments({
         search: searchQuery || undefined,
-        limit: 100,
+        limit: 50, // Reduce limit for better performance
       });
       
-      // Simulate additional metadata for demo
+      // Use word count from API and add mock metadata
       const docsWithMeta: DocumentWithMeta[] = response.documents.map(doc => ({
         ...doc,
         tags: generateRandomTags(),
         starred: Math.random() > 0.7,
-        wordCount: Math.floor(Math.random() * 5000) + 100
+        wordCount: doc.word_count || 0
       }));
       
       setDocuments(docsWithMeta);
@@ -225,10 +221,15 @@ export const Home: React.FC = () => {
     
     try {
       await apiClient.deleteDocument(docId);
-      success('Document deleted');
-      loadDocuments();
+      success('Document deleted successfully');
+      
+      // Remove from local state immediately for better UX
+      setDocuments(prev => prev.filter(doc => doc.id !== docId));
     } catch (err) {
-      error('Failed to delete document');
+      const message = err instanceof Error ? err.message : 'Failed to delete document';
+      error('Delete Failed', message);
+      // Reload in case of error
+      loadDocuments();
     }
   };
 
@@ -690,9 +691,11 @@ export const Home: React.FC = () => {
                   size="sm"
                   onClick={(e) => {
                     e.preventDefault();
+                    e.stopPropagation();
                     handleStarDocument(doc.id);
                   }}
                   className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Star document"
                 >
                   <Star className={`h-4 w-4 ${doc.starred ? 'fill-current text-yellow-500' : ''}`} />
                 </Button>
@@ -701,9 +704,11 @@ export const Home: React.FC = () => {
                   size="sm"
                   onClick={(e) => {
                     e.preventDefault();
+                    e.stopPropagation();
                     handleDeleteDocument(doc.id);
                   }}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-600"
+                  className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
+                  title="Delete document"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -741,3 +746,5 @@ export const Home: React.FC = () => {
     </div>
   );
 };
+
+export const Home = React.memo(HomeComponent);

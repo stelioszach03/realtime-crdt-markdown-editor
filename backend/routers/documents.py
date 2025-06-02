@@ -2,16 +2,44 @@
 Document management routes
 """
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 import models
 import schemas
 import auth
 from database import get_db
 import uuid
+import json
 
 router = APIRouter(prefix="/api/docs", tags=["documents"])
+limiter = Limiter(key_func=get_remote_address)
+
+
+def calculate_word_count(crdt_state: Optional[str]) -> int:
+    """Calculate word count from CRDT state"""
+    if not crdt_state:
+        return 0
+    
+    try:
+        crdt_data = json.loads(crdt_state)
+        if not crdt_data or 'nodes' not in crdt_data:
+            return 0
+        
+        # Extract text from all non-deleted nodes
+        text_parts = []
+        for node in crdt_data['nodes'].values():
+            if node and not node.get('is_deleted', False):
+                text_parts.append(node.get('value', ''))
+        
+        # Join all text and count words
+        full_text = ''.join(text_parts)
+        words = full_text.strip().split()
+        return len([word for word in words if word])
+    except Exception:
+        return 0
 
 
 @router.get("/", response_model=schemas.DocumentList)
@@ -55,15 +83,30 @@ async def list_documents(
 
 
 @router.post("/", response_model=schemas.Document, status_code=status.HTTP_201_CREATED)
+@limiter.limit("30 per minute")
 async def create_document(
+    request: Request,
     document: schemas.DocumentCreate,
     current_user: Optional[models.User] = Depends(auth.get_current_user_or_guest),
     db: Session = Depends(get_db)
 ):
     """Create a new document"""
+    # Validate document name
+    if not document.name or len(document.name.strip()) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Document name cannot be empty"
+        )
+    
+    if len(document.name) > 255:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Document name cannot exceed 255 characters"
+        )
+    
     db_document = models.Document(
         id=str(uuid.uuid4()),
-        name=document.name,
+        name=document.name.strip(),
         owner_id=current_user.id if current_user else None,  # Guest users have no owner
         is_public=True if current_user is None else document.is_public,  # Guest documents are always public
         crdt_state=None  # Will be initialized when first accessed
@@ -160,7 +203,7 @@ async def update_document(
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document(
     document_id: str,
-    current_user: models.User = Depends(auth.get_current_active_user),
+    current_user: Optional[models.User] = Depends(auth.get_current_user_or_guest),
     db: Session = Depends(get_db)
 ):
     """Delete a document"""
@@ -174,12 +217,15 @@ async def delete_document(
             detail="Document not found"
         )
     
-    # Check if user is owner
-    if document.owner_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only document owner can delete document"
-        )
+    # Check if user has permission to delete
+    # Guest documents (owner_id is None) can be deleted by anyone
+    # Otherwise, only the owner can delete
+    if document.owner_id is not None:
+        if not current_user or document.owner_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only document owner can delete document"
+            )
     
     # Delete related records first
     db.query(models.DocumentCollaborator).filter(

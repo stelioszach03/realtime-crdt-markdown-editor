@@ -33,6 +33,7 @@ class Document(Base):
     crdt_state = Column(Text, nullable=True)  # JSON serialized CRDT state
     owner_id = Column(String, ForeignKey("users.id"), nullable=True)  # Nullable for guest documents
     is_public = Column(Boolean, default=False)
+    word_count = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     

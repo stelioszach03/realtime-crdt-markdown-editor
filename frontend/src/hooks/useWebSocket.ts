@@ -46,13 +46,15 @@ export const useWebSocket = ({
   useEffect(() => {
     if (!documentId) return;
     
-    // Clean up any existing connection first
-    if (wsClientRef.current) {
-      wsClientRef.current.destroy();
-      wsClientRef.current = null;
-    }
+    // Add a small delay to prevent rapid reconnections
+    const timeoutId = setTimeout(() => {
+      // Clean up any existing connection first
+      if (wsClientRef.current) {
+        wsClientRef.current.destroy();
+        wsClientRef.current = null;
+      }
 
-    wsClientRef.current = new WebSocketClient(documentId, token);
+      wsClientRef.current = new WebSocketClient(documentId, token);
 
     // Set up event handlers
     wsClientRef.current.onConnectionStatus(setConnectionStatus);
@@ -77,17 +79,19 @@ export const useWebSocket = ({
     });
 
     wsClientRef.current.onError((error) => {
-      console.error('WebSocket error:', error);
+      // Don't log errors, just pass to handler
       onError?.(error);
     });
 
-    // Auto-connect if enabled
-    if (autoConnect) {
-      wsClientRef.current.connect();
-    }
+      // Auto-connect if enabled
+      if (autoConnect) {
+        wsClientRef.current.connect();
+      }
+    }, 100); // 100ms delay
 
     // Cleanup on unmount
     return () => {
+      clearTimeout(timeoutId);
       if (wsClientRef.current) {
         wsClientRef.current.destroy();
         wsClientRef.current = null;
@@ -223,7 +227,7 @@ export const useOfflineQueue = () => {
         const operations = JSON.parse(stored);
         setQueuedOperations(operations);
       } catch (error) {
-        console.error('Failed to load offline operations:', error);
+        // Silently clear invalid offline operations
         localStorage.removeItem('offline_operations');
       }
     }

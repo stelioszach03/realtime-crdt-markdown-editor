@@ -2,9 +2,11 @@
 User authentication and management routes
 """
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 import models
 import schemas
 import auth
@@ -12,10 +14,13 @@ from database import get_db
 
 router = APIRouter(prefix="/api/users", tags=["users"])
 security = HTTPBearer()
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/signup", response_model=schemas.User, status_code=status.HTTP_201_CREATED)
+@limiter.limit("5 per minute")
 async def signup(
+    request: Request,
     user: schemas.UserCreate,
     db: Session = Depends(get_db)
 ):
@@ -33,7 +38,9 @@ async def signup(
 
 
 @router.post("/login", response_model=schemas.Token)
+@limiter.limit("10 per minute")
 async def login(
+    request: Request,
     user_credentials: schemas.UserLogin,
     db: Session = Depends(get_db)
 ):
@@ -69,7 +76,8 @@ async def get_current_user_info(
 
 
 @router.post("/guest-token", response_model=schemas.Token)
-async def create_guest_token():
+@limiter.limit("20 per minute")
+async def create_guest_token(request: Request):
     """Create a temporary token for guest access"""
     import uuid
     site_id = str(uuid.uuid4())

@@ -2,6 +2,8 @@
  * REST API client for the collaborative editor
  */
 
+import { apiCache, cacheKeys, cacheTTL } from '../utils/apiCache';
+
 export interface User {
   id: string;
   username: string;
@@ -17,6 +19,7 @@ export interface Document {
   is_public: boolean;
   created_at: string;
   updated_at?: string;
+  word_count?: number;
 }
 
 export interface DocumentWithContent extends Document {
@@ -56,7 +59,7 @@ class ApiClient {
 
   constructor() {
     // Use environment variable or default to backend port
-    this.baseUrl = (import.meta as any).env?.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:8000`;
+    this.baseUrl = import.meta.env.VITE_API_URL || `${window.location.protocol}//${window.location.hostname}:8000`;
     
     // Load token from localStorage
     this.token = localStorage.getItem('auth_token');
@@ -84,6 +87,7 @@ class ApiClient {
     };
 
     try {
+      // Remove excessive logging for performance
       const response = await fetch(url, config);
       
       if (!response.ok) {
@@ -126,7 +130,18 @@ class ApiClient {
   }
 
   async getCurrentUser(): Promise<User> {
-    return this.request<User>('/api/users/me');
+    // Temporarily disable cache for debugging
+    // const cacheKey = cacheKeys.currentUser();
+    // const cached = apiCache.get<User>(cacheKey);
+    // if (cached) return cached;
+
+    // Fetch from API
+    const user = await this.request<User>('/api/users/me');
+    
+    // Cache the result
+    // apiCache.set(cacheKey, user, cacheTTL.currentUser);
+    
+    return user;
   }
 
   async createGuestToken(): Promise<Token> {
@@ -141,6 +156,9 @@ class ApiClient {
   logout(): void {
     this.token = null;
     localStorage.removeItem('auth_token');
+    
+    // Clear all cache on logout
+    apiCache.clear();
   }
 
   setToken(token: string): void {
@@ -162,6 +180,11 @@ class ApiClient {
     limit?: number;
     search?: string;
   }): Promise<DocumentList> {
+    // Check cache first
+    const cacheKey = cacheKeys.documents(params);
+    const cached = apiCache.get<DocumentList>(cacheKey);
+    if (cached) return cached;
+
     const searchParams = new URLSearchParams();
     
     if (params?.skip !== undefined) {
@@ -177,34 +200,64 @@ class ApiClient {
     const query = searchParams.toString();
     const endpoint = `/api/docs/${query ? `?${query}` : ''}`;
     
-    return this.request<DocumentList>(endpoint);
+    const result = await this.request<DocumentList>(endpoint);
+    
+    // Cache the result
+    apiCache.set(cacheKey, result, cacheTTL.documents);
+    
+    return result;
   }
 
   async getDocument(documentId: string): Promise<DocumentWithContent> {
-    return this.request<DocumentWithContent>(`/api/docs/${documentId}`);
+    // Check cache first
+    const cacheKey = cacheKeys.document(documentId);
+    const cached = apiCache.get<DocumentWithContent>(cacheKey);
+    if (cached) return cached;
+
+    const document = await this.request<DocumentWithContent>(`/api/docs/${documentId}`);
+    
+    // Cache the result
+    apiCache.set(cacheKey, document, cacheTTL.document);
+    
+    return document;
   }
 
   async createDocument(data: { name: string; is_public?: boolean }): Promise<Document> {
-    return this.request<Document>('/api/docs/', {
+    const document = await this.request<Document>('/api/docs/', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    
+    // Invalidate documents cache
+    apiCache.clearPattern('^documents:');
+    
+    return document;
   }
 
   async updateDocument(
     documentId: string,
     data: { name?: string; is_public?: boolean }
   ): Promise<Document> {
-    return this.request<Document>(`/api/docs/${documentId}`, {
+    const document = await this.request<Document>(`/api/docs/${documentId}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
+    
+    // Invalidate related caches
+    apiCache.delete(cacheKeys.document(documentId));
+    apiCache.clearPattern('^documents:');
+    
+    return document;
   }
 
   async deleteDocument(documentId: string): Promise<void> {
     await this.request<void>(`/api/docs/${documentId}`, {
       method: 'DELETE',
     });
+    
+    // Invalidate related caches
+    apiCache.delete(cacheKeys.document(documentId));
+    apiCache.clearPattern('^documents:');
   }
 
   // Collaborator methods

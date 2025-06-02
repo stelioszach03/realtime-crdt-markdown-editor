@@ -7,7 +7,6 @@ import {
   Code, 
   BookOpen, 
   Briefcase, 
-  Calendar,
   ListChecks,
   Lightbulb,
   FileCode,

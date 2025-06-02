@@ -15,7 +15,7 @@ import {
   FileText,
   Plus
 } from 'lucide-react';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from '../../hooks/useAuthSimplified';
 import { useTheme } from '../../hooks/useTheme';
 import { Button } from '../Shared/Button';
 import { Modal } from '../Shared/Modal';
@@ -298,8 +298,9 @@ export const Navbar: React.FC = () => {
       <Modal
         isOpen={showLoginModal}
         onClose={() => setShowLoginModal(false)}
-        title="Login"
+        title="Welcome Back"
         size="sm"
+        className="auth-modal"
       >
         <LoginForm
           onSuccess={() => setShowLoginModal(false)}
@@ -314,8 +315,9 @@ export const Navbar: React.FC = () => {
       <Modal
         isOpen={showSignupModal}
         onClose={() => setShowSignupModal(false)}
-        title="Sign Up"
+        title="Create Account"
         size="sm"
+        className="auth-modal"
       >
         <SignupForm
           onSuccess={() => setShowSignupModal(false)}

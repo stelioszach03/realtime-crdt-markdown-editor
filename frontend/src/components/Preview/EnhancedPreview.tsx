@@ -3,8 +3,7 @@
  */
 import React, { useMemo, useRef, useEffect } from 'react';
 import { marked } from 'marked';
-import { Copy, Check, ExternalLink } from 'lucide-react';
-import { Button } from '../Shared/Button';
+import DOMPurify from 'dompurify';
 
 interface EnhancedPreviewProps {
   content: string;
@@ -12,7 +11,7 @@ interface EnhancedPreviewProps {
   className?: string;
 }
 
-export const EnhancedPreview: React.FC<EnhancedPreviewProps> = ({ 
+const EnhancedPreviewComponent: React.FC<EnhancedPreviewProps> = ({ 
   content, 
   fontSize = 16,
   className = '' 
@@ -35,15 +34,13 @@ export const EnhancedPreview: React.FC<EnhancedPreviewProps> = ({
       marked.setOptions({
         gfm: true,
         breaks: true,
-        headerIds: true,
-        mangle: false,
       });
 
       // Custom renderer for enhanced features
       const renderer = new marked.Renderer();
 
       // Add anchor links to headers
-      renderer.heading = (text, level, raw) => {
+      renderer.heading = (text: string, level: number, raw: string) => {
         const id = raw.toLowerCase().replace(/[^\w]+/g, '-');
         return `
           <h${level} id="${id}" class="group relative">
@@ -58,8 +55,8 @@ export const EnhancedPreview: React.FC<EnhancedPreviewProps> = ({
       };
 
       // Enhanced code blocks with copy button
-      renderer.code = (code, language) => {
-        const id = Math.random().toString(36).substr(2, 9);
+      renderer.code = (code: string, language?: string) => {
+        const id = Math.random().toString(36).substring(2, 11);
         const escapedCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
         
         return `
@@ -79,7 +76,7 @@ export const EnhancedPreview: React.FC<EnhancedPreviewProps> = ({
       };
 
       // Enhanced links with external icon
-      renderer.link = (href, title, text) => {
+      renderer.link = (href: string, title: string | null | undefined, text: string) => {
         const isExternal = href.startsWith('http') && !href.includes(window.location.hostname);
         return `
           <a href="${href}" ${title ? `title="${title}"` : ''} 
@@ -92,7 +89,7 @@ export const EnhancedPreview: React.FC<EnhancedPreviewProps> = ({
       };
 
       // Enhanced tables
-      renderer.table = (header, body) => {
+      renderer.table = (header: string, body: string) => {
         return `
           <div class="table-wrapper">
             <table>
@@ -104,7 +101,7 @@ export const EnhancedPreview: React.FC<EnhancedPreviewProps> = ({
       };
 
       // Enhanced checkboxes
-      renderer.listitem = (text, task, checked) => {
+      renderer.listitem = (text: string, task?: boolean, checked?: boolean) => {
         if (task) {
           return `
             <li class="task-list-item">
@@ -118,7 +115,39 @@ export const EnhancedPreview: React.FC<EnhancedPreviewProps> = ({
 
       marked.use({ renderer });
 
-      return marked.parse(content);
+      const rawHtml = marked.parse(content) as string;
+      
+      // Configure DOMPurify to allow custom attributes and classes
+      DOMPurify.addHook('uponSanitizeElement', (node, data) => {
+        // Allow data attributes for code copy functionality
+        if (data.tagName === 'button' && node instanceof Element && node.classList.contains('code-block-copy')) {
+          return;
+        }
+      });
+      
+      DOMPurify.addHook('uponSanitizeAttribute', (node, data) => {
+        // Allow data-code and data-id attributes on copy buttons
+        if (node instanceof Element && node.classList.contains('code-block-copy') && 
+            (data.attrName === 'data-code' || data.attrName === 'data-id')) {
+          data.keepAttr = true;
+        }
+      });
+      
+      // Sanitize HTML to prevent XSS attacks while preserving functionality
+      return DOMPurify.sanitize(rawHtml, {
+        ALLOWED_TAGS: ['div', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 
+                      'ul', 'ol', 'li', 'blockquote', 'code', 'pre', 
+                      'a', 'strong', 'em', 'del', 'ins', 'br', 'hr',
+                      'table', 'thead', 'tbody', 'tr', 'th', 'td',
+                      'img', 'span', 'sup', 'sub', 'mark', 'button',
+                      'svg', 'path', 'input'],
+        ALLOWED_ATTR: ['href', 'title', 'src', 'alt', 'class', 'id', 
+                       'target', 'rel', 'width', 'height', 'type',
+                       'disabled', 'checked', 'data-code', 'data-id',
+                       'fill', 'stroke', 'viewBox', 'stroke-linecap',
+                       'stroke-linejoin', 'stroke-width', 'd'],
+        ALLOW_DATA_ATTR: true
+      });
     } catch (error) {
       console.error('Markdown parsing error:', error);
       return '<div class="error-message">Error parsing markdown</div>';
@@ -178,7 +207,7 @@ export const EnhancedPreview: React.FC<EnhancedPreviewProps> = ({
         dangerouslySetInnerHTML={{ __html: htmlContent }}
       />
       
-      <style jsx>{`
+      <style>{`
         .preview-content {
           color: inherit;
           line-height: 1.7;
@@ -405,3 +434,5 @@ export const EnhancedPreview: React.FC<EnhancedPreviewProps> = ({
     </div>
   );
 };
+
+export const EnhancedPreview = React.memo(EnhancedPreviewComponent);

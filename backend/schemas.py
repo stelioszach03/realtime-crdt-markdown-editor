@@ -54,6 +54,7 @@ class Document(DocumentBase):
     owner_id: Optional[str] = None  # Nullable for guest documents
     created_at: datetime
     updated_at: Optional[datetime]
+    word_count: Optional[int] = 0  # Make it optional with default 0
     
     class Config:
         from_attributes = True

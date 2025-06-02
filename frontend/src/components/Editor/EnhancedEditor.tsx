@@ -17,10 +17,8 @@ import {
   Minus,
   Table,
   CheckSquare,
-  Type,
   Strikethrough,
   FileCode,
-  Terminal,
   AlertCircle,
   Undo,
   Redo,
@@ -48,7 +46,7 @@ interface EditorAction {
   group?: string;
 }
 
-export const EnhancedEditor: React.FC<EnhancedEditorProps> = ({
+const EnhancedEditorComponent: React.FC<EnhancedEditorProps> = ({
   content,
   onChange,
   readOnly = false,
@@ -673,3 +671,5 @@ export const EnhancedEditor: React.FC<EnhancedEditorProps> = ({
     </div>
   );
 };
+
+export const EnhancedEditor = React.memo(EnhancedEditorComponent);

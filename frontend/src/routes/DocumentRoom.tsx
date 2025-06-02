@@ -1,12 +1,11 @@
 /**
  * Enhanced document room for collaborative editing
  */
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, 
   Share2, 
-  Users, 
   Wifi, 
   WifiOff, 
   Eye, 
@@ -20,13 +19,11 @@ import {
   Sun,
   Clock,
   Hash,
-  Copy,
   Check,
   MoreVertical,
-  FileText,
-  History
+  FileText
 } from 'lucide-react';
-import { useAuth } from '../hooks/useAuth.tsx';
+import { useAuth } from '../hooks/useAuthSimplified';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useTheme } from '../hooks/useTheme';
 import { useToastHelpers } from '../components/Shared/Toast';
@@ -38,6 +35,7 @@ import { Preview } from '../components/Preview/Preview';
 import { ShareModal } from '../components/RoomSelector/ShareModal';
 import { apiClient, DocumentWithContent } from '../api/apiClient';
 import { ClientSequenceCRDT } from '../crdt/clientCrdt';
+import { debounce } from '../utils/debounce';
 
 interface DocumentStats {
   words: number;
@@ -47,7 +45,7 @@ interface DocumentStats {
   readingTime: number; // in minutes
 }
 
-export const DocumentRoom: React.FC = () => {
+const DocumentRoomComponent: React.FC = () => {
   const { documentId } = useParams<{ documentId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -63,7 +61,6 @@ export const DocumentRoom: React.FC = () => {
   const [editorContent, setEditorContent] = useState('');
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [fontSize, setFontSize] = useState(14);
   const [autoSave, setAutoSave] = useState(true);
   const [showStats, setShowStats] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -90,11 +87,11 @@ export const DocumentRoom: React.FC = () => {
     documentId: documentId || '',
     token: token,
     onOperation: handleRemoteOperation,
-    onInitialState: (state) => {
-      console.log('Received initial state:', state);
+    onInitialState: () => {
+      // Silent logging - Received initial state
     },
-    onError: (error) => {
-      console.error('WebSocket error in component:', error);
+    onError: () => {
+      // Silent error handling
     }
   });
 
@@ -121,7 +118,7 @@ export const DocumentRoom: React.FC = () => {
     if (autoSave && document && crdt) {
       autoSaveIntervalRef.current = setInterval(() => {
         saveDocument(true);
-      }, 30000); // Auto-save every 30 seconds
+      }, 60000); // Auto-save every 60 seconds
 
       return () => {
         if (autoSaveIntervalRef.current) {
@@ -196,9 +193,17 @@ export const DocumentRoom: React.FC = () => {
       crdt.applyRemoteOperation(operation);
       setEditorContent(crdt.getText());
     } catch (err) {
-      console.error('Failed to apply remote operation:', err);
+      // Silent error handling - Failed to apply remote operation
     }
   }
+
+  // Create a memoized debounced function for sending operations
+  const debouncedSendOperations = useMemo(
+    () => debounce((operations: any[]) => {
+      operations.forEach(op => sendOperation(op));
+    }, 150),
+    [sendOperation]
+  );
 
   const handleEditorChange = useCallback((newContent: string) => {
     if (!crdt || !isConnected) return;
@@ -207,16 +212,19 @@ export const DocumentRoom: React.FC = () => {
       const currentContent = crdt.getText();
       const operations = crdt.generateOperationsFromDiff(currentContent, newContent);
       
+      // Apply operations locally immediately
       operations.forEach(op => {
         crdt.applyLocalOperation(op);
-        sendOperation(op);
       });
+
+      // Debounce sending operations to reduce network traffic
+      debouncedSendOperations(operations);
 
       setEditorContent(newContent);
     } catch (err) {
-      console.error('Failed to handle editor change:', err);
+      // Silent error handling - Failed to handle editor change
     }
-  }, [crdt, isConnected, sendOperation]);
+  }, [crdt, isConnected, debouncedSendOperations]);
 
   const saveDocument = async (silent = false) => {
     if (!document || !crdt) return;
@@ -301,27 +309,31 @@ export const DocumentRoom: React.FC = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    // Global keyboard shortcuts
-    if (e.ctrlKey || e.metaKey) {
-      switch (e.key) {
-        case 's':
-          e.preventDefault();
-          saveDocument();
-          break;
-        case 'p':
-          e.preventDefault();
-          setShowPreview(prev => !prev);
-          break;
-        case 'f':
-          if (e.shiftKey) {
+  // Memoized keyboard shortcut handler
+  const handleKeyDown = useMemo(
+    () => (e: KeyboardEvent) => {
+      // Global keyboard shortcuts
+      if (e.ctrlKey || e.metaKey) {
+        switch (e.key) {
+          case 's':
             e.preventDefault();
-            toggleFullscreen();
-          }
-          break;
+            saveDocument();
+            break;
+          case 'p':
+            e.preventDefault();
+            setShowPreview(prev => !prev);
+            break;
+          case 'f':
+            if (e.shiftKey) {
+              e.preventDefault();
+              toggleFullscreen();
+            }
+            break;
+        }
       }
-    }
-  }, []);
+    },
+    []
+  );
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
@@ -411,7 +423,7 @@ export const DocumentRoom: React.FC = () => {
                 {connectedUsers.size > 1 && (
                   <div className="flex items-center">
                     <div className="flex -space-x-2">
-                      {Array.from(connectedUsers.values()).slice(0, 3).map((userData, idx) => (
+                      {Array.from(connectedUsers.values()).slice(0, 3).map((userData) => (
                         <div
                           key={userData.site_id}
                           className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-xs font-medium border-2 border-white dark:border-neutral-900"
@@ -614,3 +626,5 @@ export const DocumentRoom: React.FC = () => {
     </div>
   );
 };
+
+export const DocumentRoom = React.memo(DocumentRoomComponent);

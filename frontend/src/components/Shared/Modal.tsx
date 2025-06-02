@@ -19,7 +19,7 @@ interface ModalProps {
   className?: string;
 }
 
-export const Modal: React.FC<ModalProps> = ({
+const ModalComponent: React.FC<ModalProps> = ({
   isOpen,
   onClose,
   title,
@@ -172,3 +172,5 @@ export const Modal: React.FC<ModalProps> = ({
 
   return createPortal(modalContent, document.body);
 };
+
+export const Modal = React.memo(ModalComponent);

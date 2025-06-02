@@ -26,7 +26,7 @@ interface EditorProps {
   placeholder?: string;
 }
 
-export const Editor: React.FC<EditorProps> = ({
+const EditorComponent: React.FC<EditorProps> = ({
   content,
   onChange,
   readOnly = false,
@@ -306,6 +306,8 @@ export const Editor: React.FC<EditorProps> = ({
     </div>
   );
 };
+
+export const Editor = React.memo(EditorComponent);
 
 // Helper function to get keyboard shortcuts
 function getShortcut(label: string): string {

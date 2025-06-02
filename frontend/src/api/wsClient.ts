@@ -47,7 +47,7 @@ export class WebSocketClient {
     this.token = token;
     
     // Use the same base URL as the API client
-    const apiBaseUrl = (import.meta as any).env?.VITE_API_URL || 
+    const apiBaseUrl = import.meta.env.VITE_API_URL || 
       `${window.location.protocol}//${window.location.hostname}:8000`;
     
     // Convert http/https to ws/wss
@@ -64,8 +64,6 @@ export class WebSocketClient {
 
     try {
       const wsUrl = `${this.baseUrl}/ws/${this.documentId}${this.token ? `?token=${this.token}` : ''}`;
-      console.log('WebSocket connecting to:', wsUrl);
-      console.log('Token present:', !!this.token);
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = this.handleOpen.bind(this);
@@ -73,7 +71,6 @@ export class WebSocketClient {
       this.ws.onclose = this.handleClose.bind(this);
       this.ws.onerror = this.handleError.bind(this);
     } catch (error) {
-      console.error('Failed to create WebSocket connection:', error);
       this.updateConnectionStatus('error');
       this.scheduleReconnect();
     }
@@ -93,7 +90,6 @@ export class WebSocketClient {
 
   sendOperation(operation: CRDTOperation): void {
     if (!this.isConnected()) {
-      console.warn('Cannot send operation: WebSocket not connected');
       return;
     }
 
@@ -140,14 +136,12 @@ export class WebSocketClient {
       try {
         this.ws.send(JSON.stringify(message));
       } catch (error) {
-        console.error('Failed to send WebSocket message:', error);
         this.onErrorHandler?.('Failed to send message');
       }
     }
   }
 
   private handleOpen(): void {
-    console.log('WebSocket connected');
     this.reconnectAttempts = 0;
     this.reconnectDelay = 1000;
     this.updateConnectionStatus('connected');
@@ -175,7 +169,6 @@ export class WebSocketClient {
             this.onPresenceHandler(message.presence);
           } else if (message.event && message.data) {
             // Handle presence events (user_joined, user_left)
-            console.log(`Presence event: ${message.event}`, message.data);
           }
           break;
           
@@ -190,27 +183,17 @@ export class WebSocketClient {
           break;
           
         case 'error':
-          console.error('WebSocket error message:', message.message);
           this.onErrorHandler?.(message.message);
           break;
           
         default:
-          console.warn('Unknown message type:', message.type);
       }
     } catch (error) {
-      console.error('Failed to parse WebSocket message:', error);
       this.onErrorHandler?.('Failed to parse message');
     }
   }
 
-  private handleClose(event: CloseEvent): void {
-    console.error('WebSocket disconnected:', {
-      code: event.code,
-      reason: event.reason || 'No reason provided',
-      wasClean: event.wasClean,
-      readyState: this.ws?.readyState,
-      url: this.ws?.url
-    });
+  private handleClose(): void {
     this.ws = null;
     
     if (!this.isManuallyDisconnected) {
@@ -221,26 +204,7 @@ export class WebSocketClient {
     }
   }
 
-  private handleError(event: Event): void {
-    console.error('WebSocket error:', {
-      event: event,
-      readyState: this.ws?.readyState,
-      url: this.ws?.url,
-      baseUrl: this.baseUrl,
-      documentId: this.documentId,
-      tokenPresent: !!this.token
-    });
-    
-    // Try to get more error details
-    if (this.ws) {
-      console.error('WebSocket state details:', {
-        readyState: this.ws.readyState,
-        readyStateText: ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][this.ws.readyState] || 'UNKNOWN',
-        bufferedAmount: this.ws.bufferedAmount,
-        protocol: this.ws.protocol,
-        extensions: this.ws.extensions
-      });
-    }
+  private handleError(): void {
     
     this.updateConnectionStatus('error');
     this.onErrorHandler?.('WebSocket connection error');
@@ -256,7 +220,6 @@ export class WebSocketClient {
     
     this.reconnectTimer = setTimeout(() => {
       this.reconnectAttempts++;
-      console.log(`Reconnecting... (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
       
       this.connect();
       

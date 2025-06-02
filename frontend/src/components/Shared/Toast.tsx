@@ -53,7 +53,7 @@ const ToastIcon: React.FC<{ type: ToastType }> = ({ type }) => {
   }
 };
 
-const ToastItem: React.FC<{
+const ToastItemComponent: React.FC<{
   toast: Toast;
   onRemove: (id: string) => void;
 }> = ({ toast, onRemove }) => {
@@ -144,7 +144,9 @@ const ToastItem: React.FC<{
   );
 };
 
-const ToastContainer: React.FC<{ toasts: Toast[]; onRemove: (id: string) => void }> = ({
+const ToastItem = React.memo(ToastItemComponent);
+
+const ToastContainerComponent: React.FC<{ toasts: Toast[]; onRemove: (id: string) => void }> = ({
   toasts,
   onRemove,
 }) => {
@@ -159,6 +161,8 @@ const ToastContainer: React.FC<{ toasts: Toast[]; onRemove: (id: string) => void
     document.body
   );
 };
+
+const ToastContainer = React.memo(ToastContainerComponent);
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
