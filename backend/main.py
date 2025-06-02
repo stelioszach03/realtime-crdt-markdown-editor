@@ -73,11 +73,15 @@ async def websocket_endpoint(
     # Authenticate user if token provided
     if token:
         try:
-            token_data = auth.verify_token(token)
+            # Remove "Bearer " prefix if present (in case it's passed from header format)
+            clean_token = token.replace("Bearer ", "") if token.startswith("Bearer ") else token
+            print(f"Cleaned token: {clean_token[:20] if clean_token else 'None'}...")
+            
+            token_data = auth.verify_token(clean_token)
             print(f"Token verification result: {token_data}")
             if token_data and not token_data.username.startswith("guest_"):
                 user = auth.get_user_by_username(db, token_data.username)
-                print(f"Found user: {user}")
+                print(f"Found user: {user.username if user else 'None'}")
         except Exception as e:
             print(f"Token verification error: {e}")
             pass  # Allow guest access

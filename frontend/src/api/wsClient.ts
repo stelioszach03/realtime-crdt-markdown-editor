@@ -46,10 +46,12 @@ export class WebSocketClient {
     this.documentId = documentId;
     this.token = token;
     
-    // Determine WebSocket URL - use backend port
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const hostname = window.location.hostname;
-    this.baseUrl = `${protocol}//${hostname}:8000`;
+    // Use the same base URL as the API client
+    const apiBaseUrl = (import.meta as any).env?.VITE_API_URL || 
+      `${window.location.protocol}//${window.location.hostname}:8000`;
+    
+    // Convert http/https to ws/wss
+    this.baseUrl = apiBaseUrl.replace(/^http/, 'ws');
   }
 
   connect(): void {
@@ -62,6 +64,8 @@ export class WebSocketClient {
 
     try {
       const wsUrl = `${this.baseUrl}/ws/${this.documentId}${this.token ? `?token=${this.token}` : ''}`;
+      console.log('WebSocket connecting to:', wsUrl);
+      console.log('Token present:', !!this.token);
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = this.handleOpen.bind(this);
@@ -200,7 +204,13 @@ export class WebSocketClient {
   }
 
   private handleClose(event: CloseEvent): void {
-    console.log('WebSocket disconnected:', event.code, event.reason);
+    console.error('WebSocket disconnected:', {
+      code: event.code,
+      reason: event.reason || 'No reason provided',
+      wasClean: event.wasClean,
+      readyState: this.ws?.readyState,
+      url: this.ws?.url
+    });
     this.ws = null;
     
     if (!this.isManuallyDisconnected) {
@@ -212,7 +222,26 @@ export class WebSocketClient {
   }
 
   private handleError(event: Event): void {
-    console.error('WebSocket error:', event);
+    console.error('WebSocket error:', {
+      event: event,
+      readyState: this.ws?.readyState,
+      url: this.ws?.url,
+      baseUrl: this.baseUrl,
+      documentId: this.documentId,
+      tokenPresent: !!this.token
+    });
+    
+    // Try to get more error details
+    if (this.ws) {
+      console.error('WebSocket state details:', {
+        readyState: this.ws.readyState,
+        readyStateText: ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][this.ws.readyState] || 'UNKNOWN',
+        bufferedAmount: this.ws.bufferedAmount,
+        protocol: this.ws.protocol,
+        extensions: this.ws.extensions
+      });
+    }
+    
     this.updateConnectionStatus('error');
     this.onErrorHandler?.('WebSocket connection error');
   }

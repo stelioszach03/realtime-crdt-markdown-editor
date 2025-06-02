@@ -45,6 +45,12 @@ export const useWebSocket = ({
   // Initialize WebSocket client
   useEffect(() => {
     if (!documentId) return;
+    
+    // Clean up any existing connection first
+    if (wsClientRef.current) {
+      wsClientRef.current.destroy();
+      wsClientRef.current = null;
+    }
 
     wsClientRef.current = new WebSocketClient(documentId, token);
 
@@ -87,7 +93,7 @@ export const useWebSocket = ({
         wsClientRef.current = null;
       }
     };
-  }, [documentId, token, autoConnect, onOperation, onPresence, onInitialState, onError]);
+  }, [documentId, token]); // Remove function dependencies to prevent re-renders
 
   // Handle online/offline events
   useEffect(() => {

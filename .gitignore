@@ -44,6 +44,15 @@ Thumbs.db
 
 # Logs
 *.log
+logs/
+*.log.*
+backend_output.log
+frontend_output.log
+backend_debug.log
+backend.log
+frontend.log
+servers.log
+nohup.out
 
 # Browser screenshots (testing artifacts)
 .browser_screenshots/
@@ -53,10 +62,14 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
 
 # Frontend build
 frontend/dist/
 frontend/build/
+frontend/.vite/
 
 # Environment variables
 .env
